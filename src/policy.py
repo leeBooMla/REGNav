@@ -55,7 +55,7 @@ from src.transforms import (
     ResizeCenterCropper,
     ResizeRandomCropper,
 )
-from src.models import EarlyFuseCNNEncoder
+from src.models import REGNavEncoder
 # from superglue.models.matching import Matching
 import clip
 import torchvision.transforms.functional as F
@@ -105,6 +105,8 @@ class NavNetPolicy(NetPolicy):
         visual_encoder_embedding_size=512,
         visual_obs_inputs=['*'],
         visual_encoder_init=None,
+        relations_size=2,
+        room_expert_ckpt_path_dir="*",
         **kwargs
     ):
         super().__init__(
@@ -123,6 +125,8 @@ class NavNetPolicy(NetPolicy):
                 visual_encoder_embedding_size=visual_encoder_embedding_size,
                 visual_obs_inputs=visual_obs_inputs,
                 visual_encoder_init=visual_encoder_init,
+                relations_size=relations_size,
+                room_expert_ckpt_path_dir=room_expert_ckpt_path_dir,
                 **kwargs
             ),
             action_space,
@@ -193,6 +197,8 @@ class NavNetPolicy(NetPolicy):
             cam_visual=config.habitat_baselines.eval.cam_visual,
             film_reduction=ppo_config.film_reduction,
             film_layers=ppo_config.film_layers,
+            relations_size=ppo_config.relations_size,
+            room_expert_ckpt_path_dir=ppo_config.room_expert_ckpt_path_dir
         )
 
 
@@ -217,6 +223,8 @@ class NavNet(Net):
         visual_encoder_embedding_size=512,
         visual_obs_inputs=['*'],
         visual_encoder_init=None,
+        relations_size=2,
+        room_expert_ckpt_path_dir="*",
         rgb_color_jitter=0.,
         tie_inputs_and_goal_param=False,
         goal_embedding_size=128,
@@ -231,7 +239,7 @@ class NavNet(Net):
         self.prev_action_embedding = nn.Embedding(action_space.n + 1, 32)
         self._n_prev_action = 32
         rnn_input_size = self._n_prev_action
-        ObsEncoder = EarlyFuseCNNEncoder
+        ObsEncoder = REGNavEncoder
 
         logger.info('Type of observation encoder: {}'.format(ObsEncoder))
         tied_param = {}
@@ -320,6 +328,7 @@ class NavNet(Net):
             visual_encoder_embedding_size=visual_encoder_embedding_size,
             visual_obs_inputs=visual_obs_inputs,
             visual_encoder_init=visual_encoder_init,
+            room_expert_ckpt_path_dir=room_expert_ckpt_path_dir,
             rgb_color_jitter=rgb_color_jitter,
             tied_params=tied_param if tie_inputs_and_goal_param else None,
             cam_visual=cam_visual,
@@ -337,7 +346,7 @@ class NavNet(Net):
             )
 
         self.state_encoder = build_rnn_state_encoder(
-            (0 if self.is_blind else self._hidden_size) + rnn_input_size +2,
+            (0 if self.is_blind else self._hidden_size) + rnn_input_size + relations_size,
             self._hidden_size,
             rnn_type=rnn_type,
             num_layers=num_recurrent_layers,
@@ -382,7 +391,7 @@ class NavNet(Net):
             if "visual_features" in observations:
                 visual_feats = observations["visual_features"]
             else:
-                visual_feats, cam_visual, relation = self.visual_encoder(observations)
+                visual_feats, cam_visual, relations = self.visual_encoder(observations)
                 # visual_feats, cam_visual = self.visual_encoder(observations)
                 if not isinstance(cam_visual, type(None)):
                     observations['cam_visual'] = cam_visual
@@ -407,8 +416,7 @@ class NavNet(Net):
         )
         x.append(prev_actions)
 
-        if relation is not None:
-            x.append(relation) #add relation
+        x.append(relations) #add relation
 
         x = torch.cat(x, dim=1)
         out, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states, masks, rnn_build_seq_info)

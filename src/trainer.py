@@ -190,7 +190,6 @@ class PPOTrainer(BaseRLTrainer):
             self.policy_action_space,
             orig_action_space=self.orig_policy_action_space,
         )
-        # self.actor_critic.policy_components[0].visual_encoder.encoder[1].room_encoder.encoder = load_model(self.actor_critic.policy_components[0].visual_encoder.encoder[1].room_encoder.encoder, "/data/lpn/room-expert/checkpoints/mp3d/30shot-5way/test222/max_acc.pth")
         self.obs_space = observation_space
         self.actor_critic.to(self.device)
         

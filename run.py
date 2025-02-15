@@ -48,14 +48,14 @@ def build_parser(
         "--run-type",
         choices=["train", "eval", "traverse"],
         # required=True,
-        default="train",
+        default="eval",
         help="run type of the experiment (train or eval)",
     )
     parser.add_argument(
         "--exp-config",
         type=str,
         # required=True,
-        default="exp_config/ddppo_imagenav_gibson.yaml,policy,reward,dataset,sensors,early-fusion,eval",
+        default="exp_config/ddppo_imagenav_gibson.yaml,policy,reward,dataset,sensors,REGNav,eval",
         help="path to config yaml containing info about experiment",
     )
     parser.add_argument(
